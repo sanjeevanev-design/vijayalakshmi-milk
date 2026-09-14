@@ -1,17 +1,201 @@
 "use strict";
 
 /* =========================================================
-   STORAGE
+   FIREBASE PIN LOGIN
 ========================================================= */
 
-const STORAGE = {
-    customers:"vmp_customers",
-    milk:"vmp_milk",
-    payments:"vmp_payments",
-    settings:"vmp_settings"
+/* Replace these values with the Firebase Web App configuration. */
+const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyDQOiB7qw7QpqZOOKXRd1ojk_5ogbNo2zY",
+    authDomain: "vijaylakshmi-milk.firebaseapp.com",
+    projectId: "vijaylakshmi-milk",
+    storageBucket: "vijaylakshmi-milk.firebasestorage.app",
+    messagingSenderId: "979697893607",
+    appId: "1:979697893607:web:f4e4e455cbdbd7a7f4a242"
 };
 
-const DEFAULT_SETTINGS = {
+let firebaseAuth = null;
+let loginAttempts = 0;
+let loginLockedUntil = 0;
+
+const LOGIN_MAX_ATTEMPTS = 5;
+const LOGIN_LOCK_DURATION_MS = 3 * 24 * 60 * 60 * 1000;
+const LOGIN_SECURITY_STORAGE_KEY = "vijayalakshmi_login_security";
+
+function readLoginSecurity(){
+    try{
+        const saved = JSON.parse(
+            localStorage.getItem(LOGIN_SECURITY_STORAGE_KEY) || "{}"
+        );
+
+        return {
+            attempts:Number.isInteger(saved.attempts) && saved.attempts >= 0
+                ? saved.attempts
+                : 0,
+            lockedUntil:Number.isFinite(Number(saved.lockedUntil))
+                ? Number(saved.lockedUntil)
+                : 0
+        };
+    }catch(error){
+        return {attempts:0,lockedUntil:0};
+    }
+}
+
+function writeLoginSecurity(security){
+    try{
+        localStorage.setItem(
+            LOGIN_SECURITY_STORAGE_KEY,
+            JSON.stringify(security)
+        );
+    }catch(error){
+        console.warn("Could not save login security state.",error);
+    }
+}
+
+function clearLoginSecurity(){
+    loginAttempts = 0;
+    loginLockedUntil = 0;
+
+    try{
+        localStorage.removeItem(LOGIN_SECURITY_STORAGE_KEY);
+    }catch(error){
+        console.warn("Could not clear login security state.",error);
+    }
+}
+
+function formatLockTime(milliseconds){
+    const totalHours = Math.ceil(milliseconds / (60 * 60 * 1000));
+    const days = Math.floor(totalHours / 24);
+    const hours = totalHours % 24;
+
+    if(days > 0){
+        return `${days} day${days === 1 ? "" : "s"}${hours ? ` and ${hours} hour${hours === 1 ? "" : "s"}` : ""}`;
+    }
+
+    return `${Math.max(1,hours)} hour${hours === 1 ? "" : "s"}`;
+}
+
+function firebaseConfigured(){
+    return FIREBASE_CONFIG.apiKey !== "YOUR_FIREBASE_API_KEY" &&
+        FIREBASE_CONFIG.projectId !== "YOUR_FIREBASE_PROJECT_ID";
+}
+
+function showLoginError(message){
+    const error = document.getElementById("loginError");
+    if(!error) return;
+    error.textContent = message;
+    error.classList.remove("hidden");
+}
+
+async function verifyLogin(event){
+    event.preventDefault();
+
+    const emailInput = document.getElementById("loginEmail");
+    const passwordInput = document.getElementById("loginPassword");
+    const button = document.getElementById("loginButton");
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
+    const now = Date.now();
+
+    const savedSecurity = readLoginSecurity();
+    loginAttempts = savedSecurity.attempts;
+    loginLockedUntil = savedSecurity.lockedUntil;
+
+    if(loginLockedUntil > now){
+        showLoginError(
+            `Sign-in is locked for ${formatLockTime(loginLockedUntil - now)} ` +
+            `because of repeated incorrect email or password entries.`
+        );
+        return;
+    }
+
+    if(loginLockedUntil && loginLockedUntil <= now){
+        clearLoginSecurity();
+    }
+
+    if(!email || !password){
+        showLoginError("Enter your email and password.");
+        return;
+    }
+
+    if(!firebaseAuth){
+        showLoginError("Firebase Authentication is not available.");
+        return;
+    }
+
+    button.disabled = true;
+    button.innerHTML = '<i class="bi bi-hourglass-split"></i> Signing in...';
+
+    try{
+        await firebaseAuth.signInWithEmailAndPassword(email,password);
+        clearLoginSecurity();
+        document.getElementById("loginGate").remove();
+        document.getElementById("appShell").classList.remove("app-locked");
+        init();
+    }catch(error){
+        console.error("Firebase sign-in failed:",error);
+        loginAttempts++;
+
+        if(loginAttempts >= LOGIN_MAX_ATTEMPTS){
+            loginLockedUntil = Date.now() + LOGIN_LOCK_DURATION_MS;
+            writeLoginSecurity({
+                attempts:loginAttempts,
+                lockedUntil:loginLockedUntil
+            });
+            passwordInput.value = "";
+            showLoginError(
+                "Sign-in locked for 3 days after 5 incorrect attempts."
+            );
+            return;
+        }
+
+        writeLoginSecurity({
+            attempts:loginAttempts,
+            lockedUntil:0
+        });
+        passwordInput.value = "";
+
+        const authMessage = {
+            "auth/invalid-credential":"The email or password is incorrect.",
+            "auth/user-not-found":"No Firebase account exists for this email.",
+            "auth/wrong-password":"The email or password is incorrect.",
+            "auth/invalid-email":"Enter a valid email address.",
+            "auth/user-disabled":"This Firebase account has been disabled.",
+            "auth/too-many-requests":"Too many attempts. Try again later."
+        }[error?.code] || "Could not sign in. Check your Firebase account details.";
+
+        showLoginError(authMessage);
+    }finally{
+        button.disabled = false;
+        button.innerHTML = '<i class="bi bi-box-arrow-in-right"></i> Sign In';
+    }
+}
+
+function initializeLogin(){
+    if(!firebaseConfigured()){
+        showLoginError("Add your Firebase configuration in script.js before signing in.");
+        return;
+    }
+
+    try{
+        if(!firebase.apps.length){
+            firebase.initializeApp(FIREBASE_CONFIG);
+        }
+        firebaseAuth = firebase.auth();
+    }catch(error){
+        console.error("Firebase initialization failed:",error);
+        showLoginError("Firebase could not be initialized.");
+    }
+}
+
+/* =========================================================
+   STATE
+========================================================= */
+
+let customers = [];
+let milk = [];
+let payments = [];
+let settings = {
     businessName:"Vijayalakshmi Milk Products",
     businessAddress:"",
     businessPhone:"",
@@ -22,32 +206,8 @@ const DEFAULT_SETTINGS = {
     showAdvance:true
 };
 
-/* Fallback logo used on statements/PDFs until the user uploads their own
-   via Settings > Business Logo. Once settings.businessLogo is set, that
-   value (a data: URL) is used instead everywhere a logo is shown.
-   FIX: previously pointed at an external onecompiler.io URL, which is a
-   third-party dependency that can go offline, change, or be CORS-blocked
-   and silently break the invoice logo/watermark. Replaced with a small
-   inline SVG data: URL so the app has zero dependency on any external
-   server for its default branding. */
-const DEFAULT_LOGO_URL = "data:image/svg+xml;utf8," + encodeURIComponent(
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">' +
-    '<rect width="120" height="120" rx="24" fill="%23087f5b"/>' +
-    '<text x="60" y="72" font-family="Arial, sans-serif" font-size="52" ' +
-    'font-weight="700" fill="%23ffffff" text-anchor="middle">V</text>' +
-    '</svg>'
-);
-
-/* =========================================================
-   STATE
-========================================================= */
-
-let customers = loadArray(STORAGE.customers);
-let milk = loadArray(STORAGE.milk);
-let payments = loadArray(STORAGE.payments);
-let settings = loadSettingsData();
-
-let lastSavedState = snapshotState();
+/* Default business logo hosted in the public GitHub repository. */
+const DEFAULT_LOGO_URL = "https://raw.githubusercontent.com/sanjeevanev-design/vijayalakshmi-milk/main/1.png";
 
 /* =========================================================
    BASIC HELPERS
@@ -159,205 +319,111 @@ function initials(name){
         .toUpperCase();
 }
 
-/* =========================================================
-   STORAGE VALIDATION
-========================================================= */
+function today(){
+    const d = new Date();
 
-function snapshotState(){
-    return JSON.stringify({customers,milk,payments,settings});
+    return [
+        d.getFullYear(),
+        String(d.getMonth()+1).padStart(2,"0"),
+        String(d.getDate()).padStart(2,"0")
+    ].join("-");
 }
 
-function restoreLastSavedState(){
-    try{
-        const state = JSON.parse(lastSavedState);
-        customers = state.customers || [];
-        milk = state.milk || [];
-        payments = state.payments || [];
-        settings = state.settings || {...DEFAULT_SETTINGS};
-    }catch(error){
-        console.error("State restore failed:",error);
+function startOfMonth(){
+    const d = new Date();
+
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-01`;
+}
+
+function uid(prefix){
+    if(window.crypto && crypto.randomUUID){
+        return prefix + "_" + crypto.randomUUID();
     }
+
+    return prefix + "_" + Date.now() + "_" +
+        Math.random().toString(36).slice(2,10);
 }
 
-function isISODate(value){
-    if(typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-    const date = new Date(value + "T00:00:00");
-    return !Number.isNaN(date.getTime()) && localISODate(date) === value;
-}
+function money(value){
+    const n = Number(value);
 
-function normalizeCustomer(record){
-    if(!record || typeof record !== "object" || !record.id) return null;
-    const name = String(record.name || "").trim().slice(0,80);
-    if(!name) return null;
-    return {
-        ...record,
-        id:String(record.id),
-        name,
-        phone:String(record.phone || "").replace(/\D/g, "").slice(0,10),
-        place:String(record.place || "").trim().slice(0,80),
-        startDate:isISODate(record.startDate) ? record.startDate : today()
-    };
-}
-
-function normalizeMilk(record){
-    if(!record || typeof record !== "object" || !record.id || !record.customerId || !isISODate(record.date)) return null;
-    const litres = safeNumber(record.litres,0.01,9999);
-    const rate = safeNumber(record.rate,0.01,100000);
-    if(litres === null || rate === null) return null;
-    return {
-        ...record,
-        id:String(record.id),
-        customerId:String(record.customerId),
-        date:record.date,
-        litres,
-        rate,
-        fat:safeNumber(record.fat,0,15) ?? 0,
-        snf:safeNumber(record.snf,0,15) ?? 0,
-        amount:Number((litres * rate).toFixed(2))
-    };
-}
-
-function normalizePayment(record){
-    if(!record || typeof record !== "object" || !record.id || !record.customerId || !isISODate(record.date)) return null;
-    const amount = safeNumber(record.amount,0.01,100000000);
-    if(amount === null) return null;
-    return {
-        ...record,
-        id:String(record.id),
-        customerId:String(record.customerId),
-        type:record.type === "Payment" ? "Payment" : "Advance",
-        date:record.date,
-        amount,
-        method:String(record.method || "Cash").slice(0,40),
-        note:String(record.note || "").slice(0,250)
-    };
-}
-
-function loadArray(key){
-    try{
-        const raw = localStorage.getItem(key);
-        if(!raw) return [];
-        const data = JSON.parse(raw);
-        if(!Array.isArray(data)) return [];
-        if(key === STORAGE.customers) return data.map(normalizeCustomer).filter(Boolean);
-        if(key === STORAGE.milk) return data.map(normalizeMilk).filter(Boolean);
-        if(key === STORAGE.payments) return data.map(normalizePayment).filter(Boolean);
-        return data;
-    }catch(error){
-        console.error("Storage read failed:",key,error);
-        return [];
-    }
-}
-
-/* Only these two data: URL image types are ever written to settings.businessLogo
-   (see isSafeLogoDataUrl below), so this whitelist matches that. */
-function isSafeLogoDataUrl(value){
-    return typeof value === "string" &&
-        /^data:image\/(png|jpe?g|webp);base64,[A-Za-z0-9+/=]+$/.test(value);
-}
-
-function loadSettingsData(){
-
-    try{
-
-        const raw = localStorage.getItem(STORAGE.settings);
-
-        if(!raw) return {...DEFAULT_SETTINGS};
-
-        const data = JSON.parse(raw);
-
-        if(!data || typeof data !== "object" || Array.isArray(data)){
-            return {...DEFAULT_SETTINGS};
-        }
-
-        return {
-            ...DEFAULT_SETTINGS,
-            businessName:
-                typeof data.businessName === "string"
-                    ? data.businessName.slice(0,120)
-                    : DEFAULT_SETTINGS.businessName,
-
-            businessAddress:
-                typeof data.businessAddress === "string"
-                    ? data.businessAddress.slice(0,250)
-                    : "",
-
-            businessPhone:
-                typeof data.businessPhone === "string"
-                    ? data.businessPhone.slice(0,20)
-                    : "",
-
-            businessGstPercent:
-                safeNumber(data.businessGstPercent,0,100) ?? 0,
-
-            businessLogo:
-                isSafeLogoDataUrl(data.businessLogo)
-                    ? data.businessLogo
-                    : "",
-
-            showFat:data.showFat !== false,
-            showSnf:data.showSnf !== false,
-            showAdvance:data.showAdvance !== false
-        };
-
-    }catch(error){
-
-        console.error("Settings read failed:",error);
-
-        return {...DEFAULT_SETTINGS};
-    }
-}
-
-function saveData(){
-
-    const payload = {
-        [STORAGE.customers]:customers,
-        [STORAGE.milk]:milk,
-        [STORAGE.payments]:payments,
-        [STORAGE.settings]:settings
-    };
-
-    const previousStorage = {};
-
-    try{
-
-        Object.keys(payload).forEach(key=>{
-            previousStorage[key] = localStorage.getItem(key);
+    return "₹" + (Number.isFinite(n) ? n : 0)
+        .toLocaleString("en-IN",{
+            minimumFractionDigits:2,
+            maximumFractionDigits:2
         });
-
-        Object.entries(payload).forEach(([key,value])=>{
-            localStorage.setItem(key,JSON.stringify(value));
-        });
-
-        lastSavedState = snapshotState();
-        return true;
-
-    }catch(error){
-
-        console.error("Save failed:",error);
-
-        Object.entries(previousStorage).forEach(([key,value])=>{
-            try{
-                if(value === null) localStorage.removeItem(key);
-                else localStorage.setItem(key,value);
-            }catch(rollbackError){
-                console.error("Storage rollback failed:",rollbackError);
-            }
-        });
-
-        restoreLastSavedState();
-        showToast(
-            "Could not save data. Browser storage may be full.",
-            true
-        );
-        updateAll();
-        return false;
-    }
 }
 
-/* =========================================================
-   TOAST
-========================================================= */
+function formatDate(value){
+    if(!value) return "-";
+
+    const d = new Date(value + "T00:00:00");
+
+    if(Number.isNaN(d.getTime())) return "-";
+
+    return d.toLocaleDateString("en-IN",{
+        day:"2-digit",
+        month:"short",
+        year:"numeric"
+    });
+}
+
+function escapeHTML(value){
+    return String(value ?? "")
+        .replace(/&/g,"&amp;")
+        .replace(/</g,"&lt;")
+        .replace(/>/g,"&gt;")
+        .replace(/"/g,"&quot;")
+        .replace(/'/g,"&#039;");
+}
+
+/* Escapes a value for safe use inside an HTML attribute (e.g. src="...").
+   Same as escapeHTML but kept as a distinct name so attribute-context
+   call sites are easy to audit. */
+function escapeAttr(value){
+    return escapeHTML(value);
+}
+
+function safeNumber(value,min=0,max=Number.MAX_SAFE_INTEGER){
+    const n = Number(value);
+
+    if(!Number.isFinite(n)) return null;
+
+    if(n < min || n > max) return null;
+
+    return n;
+}
+
+function entryAmount(record){
+    const litres = safeNumber(record?.litres,0,999999999);
+    const rate = safeNumber(record?.rate,0,999999999);
+
+    if(litres === null || rate === null) return 0;
+
+    return litres * rate;
+}
+
+function getCustomer(id){
+    return customers.find(c => c.id === id);
+}
+
+function customerName(id){
+    const c = getCustomer(id);
+    return c ? String(c.name) : "Unknown Customer";
+}
+
+function initials(name){
+    const text = String(name || "?").trim();
+
+    if(!text) return "?";
+
+    return text
+        .split(/\s+/)
+        .slice(0,2)
+        .map(x => x[0])
+        .join("")
+        .toUpperCase();
+}
 
 function showToast(message,error=false){
 
@@ -609,12 +675,8 @@ function saveCustomer(event){
 
     }
 
-    if(saveData()){
-
-        closeModal("customerModal");
-        updateAll();
-
-    }
+    updateAll();
+    closeModal("customerModal");
 }
 
 function deleteCustomer(id){
@@ -646,13 +708,8 @@ function deleteCustomer(id){
     payments =
         payments.filter(p=>p.customerId!==id);
 
-    if(saveData()){
-
-        updateAll();
-
-        showToast("Customer deleted.");
-
-    }
+    updateAll();
+    showToast("Customer deleted.");
 }
 
 function renderCustomers(){
@@ -1120,12 +1177,8 @@ function saveMilkEntry(event){
 
     }
 
-    if(saveData()){
-
-        closeModal("milkModal");
-        updateAll();
-
-    }
+    updateAll();
+    closeModal("milkModal");
 }
 
 function deleteMilk(id){
@@ -1142,13 +1195,8 @@ function deleteMilk(id){
     milk =
         milk.filter(m=>m.id!==id);
 
-    if(saveData()){
-
-        updateAll();
-
-        showToast("Milk entry deleted.");
-
-    }
+    updateAll();
+    showToast("Milk entry deleted.");
 }
 
 
@@ -1729,12 +1777,8 @@ function savePayment(event){
 
     }
 
-    if(saveData()){
-
-        closeModal("paymentModal");
-        updateAll();
-
-    }
+    updateAll();
+    closeModal("paymentModal");
 }
 
 function deletePayment(id){
@@ -1750,13 +1794,8 @@ function deletePayment(id){
     payments =
         payments.filter(p=>p.id!==id);
 
-    if(saveData()){
-
-        updateAll();
-
-        showToast("Payment deleted.");
-
-    }
+    updateAll();
+    showToast("Payment deleted.");
 }
 
 function renderPayments(){
@@ -3125,11 +3164,11 @@ async function downloadCustomerPDF(){
 
     try{
 
-        const SCALE = 2; // matches the on-screen resolution closely
-        const CSS_STRIP_HEIGHT = 260; // px of the *unscaled* page per strip
+        const SCALE = 3; // Increased scale for better quality
+        const CSS_STRIP_HEIGHT = 200; // Reduced strip height for finer processing
         const totalCssHeight = page.scrollHeight;
         const stripCount = Math.max(1, Math.ceil(totalCssHeight / CSS_STRIP_HEIGHT));
-        const MAX_STRIPS = 60;
+        const MAX_STRIPS = 80; // Adjusted for new strip height
 
         if(stripCount > MAX_STRIPS){
             throw new Error("Statement is too long to export safely.");
@@ -3140,13 +3179,12 @@ async function downloadCustomerPDF(){
             orientation:"portrait",
             unit:"mm",
             format:"a4",
-            compress:true
+            compress: false // Disable compression for better quality
         });
 
         const pdfPageWidth = pdf.internal.pageSize.getWidth();
         const pdfPageHeight = pdf.internal.pageSize.getHeight();
         const mmPerCssPx = pdfPageWidth / 794;
-        const pdfPageHeightCssPx = pdfPageHeight / mmPerCssPx;
 
         let cursorMm = 0; // where on the current PDF page (in mm) we are
         let pageStarted = false;
@@ -3161,16 +3199,14 @@ async function downloadCustomerPDF(){
 
             if(stripHeight <= 0) break;
 
-            /* Capture ONLY this small strip of the page. Each call here is
-               small and fast — never the multi-second operation a full-page
-               capture would be. */
+            // Capture ONLY this small strip of the page
             const stripCanvas = await html2canvas(page,{
                 scale:SCALE,
                 useCORS:true,
                 allowTaint:false,
                 backgroundColor:"#FFFFFF",
                 logging:false,
-                imageTimeout:10000,
+                imageTimeout:15000, // Increased timeout
                 windowWidth:794,
                 scrollX:0,
                 scrollY:0,
@@ -3182,14 +3218,14 @@ async function downloadCustomerPDF(){
 
             await yieldToBrowser();
 
-            const stripDataUrl = stripCanvas.toDataURL("image/jpeg",0.92);
+            // Use higher quality PNG instead of JPEG
+            const stripDataUrl = stripCanvas.toDataURL("image/png");
 
             await yieldToBrowser();
 
             const stripHeightMm = stripHeight * mmPerCssPx;
 
-            /* Start a new PDF page whenever the next strip would overflow
-               the current one, so strips never get cut across pages. */
+            // Start a new PDF page when needed
             if(!pageStarted || cursorMm + stripHeightMm > pdfPageHeight){
                 if(pageStarted) pdf.addPage();
                 pageStarted = true;
@@ -3198,19 +3234,19 @@ async function downloadCustomerPDF(){
 
             pdf.addImage(
                 stripDataUrl,
-                "JPEG",
+                "PNG", // Changed to PNG for better quality
                 0,
                 cursorMm,
                 pdfPageWidth,
                 stripHeightMm,
                 undefined,
-                "FAST"
+                "NONE" // No compression for better quality
             );
 
             cursorMm += stripHeightMm;
 
-            // More frequent yielding to prevent long-running loops
-            if (strip % 5 === 0) {
+            // Yield more frequently to prevent blocking
+            if (strip % 3 === 0) {
                 await yieldToBrowser();
             }
         }
@@ -3594,11 +3630,9 @@ function handleLogoUpload(event){
             businessLogo:reader.result
         };
 
-        if(saveData()){
             renderLogoPreview();
-            generateStatementPreview();
-            showToast("Logo updated.");
-        }
+    generateStatementPreview();
+    showToast("Logo updated.");
 
         event.target.value = "";
     };
@@ -3622,11 +3656,9 @@ function removeLogo(){
         businessLogo:""
     };
 
-    if(saveData()){
-        renderLogoPreview();
-        generateStatementPreview();
-        showToast("Logo removed.");
-    }
+    renderLogoPreview();
+    generateStatementPreview();
+    showToast("Logo removed.");
 }
 
 function saveSettings(){
@@ -3708,14 +3740,9 @@ function saveSettings(){
 
     updateToggleIcons();
 
-    if(saveData()){
-
-            renderMilk();
-        generateStatementPreview();
-
-        showToast("Settings saved.");
-
-    }
+    renderMilk();
+    generateStatementPreview();
+    showToast("Settings saved.");
 }
 
 /* =========================================================
@@ -4055,8 +4082,6 @@ function init(){
 
     normalizeExistingData();
 
-    saveData();
-
     loadSettingsUI();
 
     populateCustomerSelects();
@@ -4123,12 +4148,9 @@ function seedDemoDataManually(){
         });
     }
 
-    if(saveData()){
-        updateAll();
-        showToast("Demo data added.");
-    }
+    updateAll();
+    showToast("Demo data added.");
 }
 
-/* Start application */
-
-document.addEventListener("DOMContentLoaded",init);
+/* Start application only after the Firestore PIN is verified. */
+document.addEventListener("DOMContentLoaded",initializeLogin);
