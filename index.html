@@ -16,13 +16,55 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.4/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
+<!-- Firebase Email/Password Authentication -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+
 <link rel="stylesheet" href="styles.css">
 
 </head>
 
 <body>
 
-<div class="app">
+<!-- ================= LOGIN ================= -->
+<div id="loginGate" class="login-gate">
+    <div class="login-card">
+        <div class="login-icon"><i class="bi bi-shield-lock"></i></div>
+        <h1>Welcome Back</h1>
+        <p>Sign in with your Firebase account to continue.</p>
+
+        <form id="loginForm" onsubmit="verifyLogin(event)">
+            <label for="loginEmail">Email address</label>
+            <input
+                id="loginEmail"
+                class="input"
+                type="email"
+                autocomplete="email"
+                required
+                autofocus
+                placeholder="you@example.com"
+            >
+
+            <label for="loginPassword">Password</label>
+            <input
+                id="loginPassword"
+                class="input"
+                type="password"
+                autocomplete="current-password"
+                required
+                placeholder="Enter your password"
+            >
+
+            <div id="loginError" class="error hidden"></div>
+            <button id="loginButton" class="btn btn-primary btn-block" type="submit">
+                <i class="bi bi-box-arrow-in-right"></i>
+                Sign In
+            </button>
+        </form>
+    </div>
+</div>
+
+<div id="appShell" class="app app-locked">
 
 <!-- ================= SIDEBAR ================= -->
 
@@ -1100,7 +1142,7 @@
 
 </div>
 
-<script src="script.js"></script>
+<script src="script.js?v=auth2"></script>
 
 </body>
 </html>
