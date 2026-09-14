@@ -15,6 +15,7 @@ const FIREBASE_CONFIG = {
 };
 
 let firebaseAuth = null;
+let firebaseDb = null;
 let loginAttempts = 0;
 let loginLockedUntil = 0;
 
@@ -182,9 +183,66 @@ function initializeLogin(){
             firebase.initializeApp(FIREBASE_CONFIG);
         }
         firebaseAuth = firebase.auth();
+        firebaseDb = typeof firebase.firestore === "function"
+            ? firebase.firestore()
+            : null;
+
+        if(!firebaseDb){
+            showLoginError("Firestore library is not available.");
+        }
     }catch(error){
         console.error("Firebase initialization failed:",error);
         showLoginError("Firebase could not be initialized.");
+    }
+}
+
+/* =========================================================
+   FIRESTORE DATA SYNC
+========================================================= */
+
+function currentUserStateRef(){
+    const user = firebaseAuth?.currentUser;
+    if(!firebaseDb || !user) return null;
+    return firebaseDb.collection("users").doc(user.uid);
+}
+
+async function loadCloudData(){
+    const ref = currentUserStateRef();
+    if(!ref) return;
+
+    try{
+        const snapshot = await ref.get();
+        const data = snapshot.exists ? snapshot.data() : {};
+
+        if(Array.isArray(data.customers)) customers = data.customers;
+        if(Array.isArray(data.milk)) milk = data.milk;
+        if(Array.isArray(data.payments)) payments = data.payments;
+        if(data.settings && typeof data.settings === "object"){
+            settings = {...settings, ...data.settings};
+        }
+    }catch(error){
+        console.error("Firestore data load failed:",error);
+        showToast("Could not load cloud data. Check Firestore rules.",true);
+    }
+}
+
+async function saveCloudData(){
+    const ref = currentUserStateRef();
+    if(!ref) return false;
+
+    try{
+        await ref.set({
+            customers,
+            milk,
+            payments,
+            settings,
+            updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+        },{merge:true});
+        return true;
+    }catch(error){
+        console.error("Firestore data save failed:",error);
+        showToast("Could not save to Firebase. Check Firestore rules.",true);
+        return false;
     }
 }
 
@@ -317,6 +375,19 @@ function initials(name){
         .map(x => x[0])
         .join("")
         .toUpperCase();
+}
+
+function isISODate(value){
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ""))){
+        return false;
+    }
+
+    const [year,month,day] = String(value).split("-").map(Number);
+    const date = new Date(year,month-1,day);
+
+    return date.getFullYear() === year &&
+        date.getMonth() === month-1 &&
+        date.getDate() === day;
 }
 
 function today(){
@@ -4057,15 +4128,16 @@ function updateAll(){
 
     generateStatementPreview();
 
-
+    saveCloudData();
 }
 
 /* =========================================================
    INITIALIZATION
 ========================================================= */
 
-function init(){
+async function init(){
 
+    await loadCloudData();
     normalizeExistingData();
 
     /* FIX (bug #4 — critical): seedSanjeevanDemoData() used to run on
