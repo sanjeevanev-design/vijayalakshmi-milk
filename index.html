@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#087f5b">
+<title>Vijayalakshmi Milk Products</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Fraunces:wght@500;600;700&family=Montserrat:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.4/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<link rel="stylesheet" href="styles.css">
+
+</head>
+
+<body>
+
+<div class="app">
+
+<!-- ================= SIDEBAR ================= -->
+
+<aside class="sidebar">
+
+    <div class="side-brand">
+        <div>
+            <strong id="sideBusinessName">Vijayalakshmi</strong>
+            <span>Milk Products</span>
+        </div>
+    </div>
+
+    <div class="nav-label">Main</div>
+
+    <nav class="side-nav">
+        <button data-page="dashboardPage" class="active" onclick="showPage('dashboardPage')">
+            <i class="bi bi-grid-1x2"></i> Dashboard
+        </button>
+
+        <button data-page="customersPage" onclick="showPage('customersPage')">
+            <i class="bi bi-people"></i> Customers
+        </button>
+
+        <button data-page="collectionPage" onclick="showPage('collectionPage')">
+            <i class="bi bi-droplet"></i> Milk Collection
+        </button>
+
+        <button data-page="paymentsPage" onclick="showPage('paymentsPage')">
+            <i class="bi bi-wallet2"></i> Payments
+        </button>
+
+        <button data-page="reportsPage" onclick="showPage('reportsPage')">
+            <i class="bi bi-bar-chart"></i> Reports
+        </button>
+
+        <button data-page="statementPage" onclick="showPage('statementPage')">
+            <i class="bi bi-file-earmark-text"></i> Statements
+        </button>
+    </nav>
+
+    <div class="nav-label">System</div>
+
+    <nav class="side-nav">
+        <button data-page="settingsPage" onclick="showPage('settingsPage')">
+            <i class="bi bi-gear"></i> Settings
+        </button>
+    </nav>
+
+</aside>
+
+<!-- ================= MOBILE HEADER ================= -->
+
+<header class="mobile-header">
+
+    <div class="brand">
+        <div class="brand-text">
+            <strong id="mobileBusinessName">Vijayalakshmi Milk</strong>
+            <span>Milk Products</span>
+        </div>
+    </div>
+
+    <button class="header-btn" onclick="showPage('settingsPage')" aria-label="Settings">
+        <i class="bi bi-gear"></i>
+    </button>
+
+</header>
+
+<!-- ================= MAIN ================= -->
+
+<main class="main">
+
+<!-- ================= DASHBOARD ================= -->
+
+<section id="dashboardPage" class="page active">
+
+    <div class="hero">
+
+        <div class="hero-content">
+            <small id="dashboardDate">Today</small>
+
+            <h1 id="dashboardGreeting">Good Morning 👋</h1>
+
+            <p>
+                Manage today's milk collection, customers and payments
+                from one place.
+            </p>
+        </div>
+
+    </div>
+
+    <div class="stats">
+
+        <div class="stat">
+            <div class="stat-icon">
+                <i class="bi bi-people"></i>
+            </div>
+
+            <div class="stat-label">Today's Customers</div>
+            <div class="stat-value" id="statCustomers">0</div>
+        </div>
+
+        <div class="stat">
+            <div class="stat-icon">
+                <i class="bi bi-droplet"></i>
+            </div>
+
+            <div class="stat-label">Today's Milk</div>
+            <div class="stat-value" id="statMilk">0.00 L</div>
+        </div>
+
+        <div class="stat">
+            <div class="stat-icon">
+                <i class="bi bi-currency-rupee"></i>
+            </div>
+
+            <div class="stat-label">Collection Amount</div>
+            <div class="stat-value" id="statCollection">₹0.00</div>
+        </div>
+
+        <div class="stat">
+            <div class="stat-icon">
+                <i class="bi bi-wallet2"></i>
+            </div>
+
+            <div class="stat-label">Today's Advance</div>
+            <div class="stat-value" id="statAdvance">₹0.00</div>
+        </div>
+
+    </div>
+
+    <div class="card">
+
+        <div class="card-head">
+
+            <div>
+                <h2>Today's Collection</h2>
+                <p>Today's recorded milk</p>
+            </div>
+
+            <button class="btn btn-soft" onclick="showPage('collectionPage')">
+                View All
+                <i class="bi bi-arrow-right"></i>
+            </button>
+
+        </div>
+
+        <div id="dashboardCollection"></div>
+
+    </div>
+
+</section>
+
+<!-- ================= CUSTOMERS ================= -->
+
+<section id="customersPage" class="page">
+
+    <div class="page-heading">
+        <h1>Customers</h1>
+        <p>Manage customer information and collection records.</p>
+    </div>
+
+    <div class="card">
+
+        <div class="toolbar">
+
+            <div class="search">
+                <i class="bi bi-search"></i>
+                <input
+                    type="search"
+                    id="customerSearch"
+                    placeholder="Search customers..."
+                    oninput="renderCustomers()"
+                >
+            </div>
+
+            <button class="btn btn-primary" onclick="openCustomerModal()">
+                <i class="bi bi-plus-lg"></i>
+                Add Customer
+            </button>
+
+        </div>
+
+        <div id="customerGrid"></div>
+
+    </div>
+
+</section>
+
+<!-- ================= COLLECTION ================= -->
+
+<section id="collectionPage" class="page">
+
+    <div class="page-heading">
+        <h1>Milk Collection</h1>
+        <p>Record and manage daily milk collection.</p>
+    </div>
+
+    <div class="collection-toolbar toolbar">
+
+        <div class="search">
+            <i class="bi bi-search"></i>
+            <input
+                type="search"
+                id="milkSearch"
+                placeholder="Search customers..."
+                oninput="renderMilk()"
+            >
+        </div>
+
+        <button class="btn btn-primary" onclick="openMilkModal()">
+            <i class="bi bi-plus-lg"></i>
+            Add Milk
+        </button>
+
+    </div>
+
+    <div id="milkTable"></div>
+
+</section>
+
+<!-- ================= PAYMENTS ================= -->
+
+<section id="paymentsPage" class="page">
+
+    <div class="page-heading">
+        <h1>Payments</h1>
+        <p>Manage advance payments, payable balance and payment history.</p>
+    </div>
+
+    <div class="card">
+
+        <div class="tabs">
+
+            <button class="tab active" onclick="switchPaymentTab('advanceTab',this)">
+                <i class="bi bi-wallet2"></i>
+                Advance
+            </button>
+
+            <button class="tab" onclick="switchPaymentTab('balanceTab',this)">
+                <i class="bi bi-calculator"></i>
+                Balance
+            </button>
+
+            <button class="tab" onclick="switchPaymentTab('historyTab',this)">
+                <i class="bi bi-clock-history"></i>
+                History
+            </button>
+
+        </div>
+
+        <!-- ADVANCE -->
+
+        <div id="advanceTab" class="panel active">
+
+            <div class="money-summary">
+
+                <div class="money-box">
+                    <small>Total Advance Given</small>
+                    <strong id="totalAdvance">₹0.00</strong>
+                </div>
+
+                <div class="money-box">
+                    <small>Customers With Advance</small>
+                    <strong id="advanceCustomers">0</strong>
+                </div>
+
+            </div>
+
+            <div class="card-head">
+
+                <div>
+                    <h2>Advance Payments</h2>
+                    <p>Money given before final settlement.</p>
+                </div>
+
+                <button class="btn btn-primary" onclick="openPaymentModal('Advance')">
+                    <i class="bi bi-plus-lg"></i>
+                    Add Advance
+                </button>
+
+            </div>
+
+            <div id="advanceTable"></div>
+
+        </div>
+
+        <!-- BALANCE -->
+
+        <div id="balanceTab" class="panel">
+
+            <div class="card-head">
+
+                <div>
+                    <h2>Balance Payable</h2>
+                    <p>
+                        Milk value minus payments already given.
+                    </p>
+                </div>
+
+            </div>
+
+            <div id="balanceTable"></div>
+
+        </div>
+
+        <!-- HISTORY -->
+
+        <div id="historyTab" class="panel">
+
+            <div class="card-head">
+
+                <div>
+                    <h2>Payment History</h2>
+                    <p>Every advance and payment transaction.</p>
+                </div>
+
+                <button class="btn btn-primary" onclick="openPaymentModal('Payment')">
+                    <i class="bi bi-plus-lg"></i>
+                    Add Payment
+                </button>
+
+            </div>
+
+            <div id="paymentHistoryTable"></div>
+
+        </div>
+
+    </div>
+
+</section>
+
+<!-- ================= REPORTS ================= -->
+
+<section id="reportsPage" class="page">
+
+    <div class="page-heading">
+        <h1>Reports</h1>
+        <p>Generate and print useful business reports.</p>
+    </div>
+
+    <div class="report-grid">
+
+        <div class="report-card">
+
+            <div class="report-icon">
+                <i class="bi bi-file-earmark-pdf"></i>
+            </div>
+
+            <strong>Today's Collection</strong>
+
+            <p>
+                Generate today's complete morning milk collection PDF.
+            </p>
+
+            <button class="btn btn-pdf" onclick="downloadTodayPDF()">
+                <i class="bi bi-download"></i>
+                Download PDF
+            </button>
+
+        </div>
+
+        <div class="report-card">
+
+            <div class="report-icon">
+                <i class="bi bi-person-vcard"></i>
+            </div>
+
+            <strong>Customer Statement</strong>
+
+            <p>
+                Generate a customer-wise statement for any date range.
+            </p>
+
+            <button class="btn btn-primary" onclick="showPage('statementPage')">
+                <i class="bi bi-arrow-right"></i>
+                Open Statement
+            </button>
+
+        </div>
+
+        <div class="report-card">
+
+            <div class="report-icon">
+                <i class="bi bi-printer"></i>
+            </div>
+
+            <strong>Print Statement</strong>
+
+            <p>
+                Use the A4 layout and save it as PDF through the browser.
+            </p>
+
+            <button class="btn btn-light" onclick="showPage('statementPage')">
+                <i class="bi bi-printer"></i>
+                Create Statement
+            </button>
+
+        </div>
+
+    </div>
+
+</section>
+
+<!-- ================= STATEMENT ================= -->
+
+<section id="statementPage" class="page">
+
+    <div class="page-heading">
+        <h1>Customer Statement</h1>
+        <p>Create a premium A4 milk collection statement.</p>
+    </div>
+
+    <div class="statement-layout">
+
+        <div class="card statement-builder">
+
+            <div class="card-head">
+                <div>
+                    <h2>Statement Details</h2>
+                    <p>Select customer and period.</p>
+                </div>
+            </div>
+
+            <div class="form-group">
+
+                <label for="statementCustomer">Customer</label>
+
+                <select class="input" id="statementCustomer" onchange="generateStatementPreview()">
+                    <option value="">Select customer</option>
+                </select>
+
+            </div>
+
+            <div class="form-grid two">
+
+                <div class="form-group">
+                    <label for="statementStart">Starting Date</label>
+                    <input
+                        class="input"
+                        type="date"
+                        id="statementStart"
+                        onchange="generateStatementPreview()"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="statementEnd">Ending Date</label>
+                    <input
+                        class="input"
+                        type="date"
+                        id="statementEnd"
+                        onchange="generateStatementPreview()"
+                    >
+                </div>
+
+            </div>
+
+            <div id="statementDateError" class="error hidden">
+                Starting date must be on or before ending date.
+            </div>
+
+            <div class="statement-actions">
+
+                <button class="btn btn-pdf btn-block" onclick="downloadCustomerPDF()">
+                    <i class="bi bi-file-earmark-pdf"></i>
+                    Download PDF
+                </button>
+
+                <button
+                    class="btn btn-light btn-block"
+                    style="margin-top:8px"
+                    onclick="printStatement()"
+                >
+                    <i class="bi bi-printer"></i>
+                    Print / Save PDF
+                </button>
+
+            </div>
+
+        </div>
+
+        <div class="statement-preview">
+            <div id="statementPreview">
+                <div class="empty">
+                    <div class="empty-icon">
+                        <i class="bi bi-file-earmark-text"></i>
+                    </div>
+                    <strong>Statement Preview</strong>
+                    <p>Select a customer to generate the statement.</p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</section>
+
+<!-- ================= SETTINGS ================= -->
+
+<section id="settingsPage" class="page">
+
+    <div class="page-heading">
+        <h1>Settings</h1>
+        <p>Business details, statement options and data backup.</p>
+    </div>
+
+    <div class="card">
+
+        <div class="card-head">
+            <div>
+                <h2>Business Details</h2>
+                <p>These details appear on statements.</p>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="logoUpload">Business Logo</label>
+            <div class="logo-upload">
+                <div class="logo-preview" id="logoPreview">
+                    <i class="bi bi-image"></i>
+                </div>
+                <button type="button" class="btn btn-soft" onclick="document.getElementById('logoUpload').click()">
+                    <i class="bi bi-upload"></i>
+                    Upload Logo
+                </button>
+                <button type="button" class="btn btn-light" onclick="removeLogo()">
+                    <i class="bi bi-x-circle"></i>
+                    Remove
+                </button>
+                <input
+                    type="file"
+                    id="logoUpload"
+                    class="hidden"
+                    accept="image/png,image/jpeg,image/webp"
+                    onchange="handleLogoUpload(event)"
+                >
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="businessName">Business Name</label>
+            <input
+                class="input"
+                id="businessName"
+                placeholder="Business name"
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="businessAddress">Business Address</label>
+            <input
+                class="input"
+                id="businessAddress"
+                placeholder="Enter business address"
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="businessPhone">Business Phone</label>
+            <input
+                class="input"
+                id="businessPhone"
+                type="tel"
+                inputmode="numeric"
+                maxlength="10"
+                placeholder="10 digit phone number"
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="businessGst">GST %</label>
+            <input
+                class="input"
+                id="businessGst"
+                type="number"
+                inputmode="decimal"
+                min="0"
+                max="100"
+                step="0.01"
+                placeholder="e.g. 5"
+            >
+        </div>
+
+        <div class="setting-row">
+
+            <div>
+                <strong>Show FAT</strong>
+                <span>Include FAT percentage.</span>
+            </div>
+
+            <label class="switch" aria-label="Toggle Show FAT">
+                <input type="checkbox" id="showFat" onchange="saveSettings()">
+                <i class="bi bi-toggle-off toggle-icon" aria-hidden="true"></i>
+            </label>
+
+        </div>
+
+        <div class="setting-row">
+
+            <div>
+                <strong>Show SNF</strong>
+                <span>Include SNF percentage.</span>
+            </div>
+
+            <label class="switch" aria-label="Toggle Show SNF">
+                <input type="checkbox" id="showSnf" onchange="saveSettings()">
+                <i class="bi bi-toggle-off toggle-icon" aria-hidden="true"></i>
+            </label>
+
+        </div>
+
+        <div class="setting-row">
+
+            <div>
+                <strong>Show Payment Summary</strong>
+                <span>Include payment information in statements.</span>
+            </div>
+
+            <label class="switch" aria-label="Toggle Show Payment Summary">
+                <input type="checkbox" id="showAdvance" onchange="saveSettings()">
+                <i class="bi bi-toggle-off toggle-icon" aria-hidden="true"></i>
+            </label>
+
+        </div>
+
+    </div>
+
+    <div class="card">
+
+        <div class="card-head">
+
+            <div>
+                <h2>Data & Backup</h2>
+                <p>
+                    Your data is stored locally in this browser.
+                    Backup regularly.
+                </p>
+            </div>
+
+        </div>
+
+        <div class="data-actions">
+
+            <button class="btn btn-primary" onclick="exportData()">
+                <i class="bi bi-file-earmark-excel"></i>
+                Backup Data (Excel)
+            </button>
+
+        </div>
+
+    </div>
+
+</section>
+
+</main>
+
+<!-- ================= MOBILE NAV ================= -->
+
+<nav class="bottom-nav">
+
+    <button data-page="dashboardPage" class="active" onclick="showPage('dashboardPage')">
+        <i class="bi bi-grid-1x2"></i>
+        <span>Home</span>
+    </button>
+
+    <button data-page="customersPage" onclick="showPage('customersPage')">
+        <i class="bi bi-people"></i>
+        <span>Customers</span>
+    </button>
+
+    <button data-page="collectionPage" onclick="showPage('collectionPage')">
+        <i class="bi bi-droplet"></i>
+        <span>Collection</span>
+    </button>
+
+    <button data-page="paymentsPage" onclick="showPage('paymentsPage')">
+        <i class="bi bi-wallet2"></i>
+        <span>Payments</span>
+    </button>
+
+    <button data-page="reportsPage" onclick="showPage('reportsPage')">
+        <i class="bi bi-three-dots"></i>
+        <span>More</span>
+    </button>
+
+</nav>
+
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<!-- ================= CUSTOMER MODAL ================= -->
+
+<div class="modal" id="customerModal">
+
+    <div class="modal-box">
+
+        <div class="modal-head">
+
+            <h3 id="customerModalTitle">Add Customer</h3>
+
+            <button class="modal-close" onclick="closeModal('customerModal')">
+                <i class="bi bi-x-lg"></i>
+            </button>
+
+        </div>
+
+        <form id="customerForm" onsubmit="saveCustomer(event)">
+
+            <div class="modal-body">
+
+                <input type="hidden" id="customerId">
+
+                <div class="form-group">
+
+                    <label for="customerName">Customer Name *</label>
+
+                    <input
+                        class="input"
+                        id="customerName"
+                        required
+                        maxlength="80"
+                        placeholder="Enter customer name"
+                    >
+
+                </div>
+
+                <div class="form-group">
+
+                    <label for="customerPhone">Phone Number</label>
+
+                    <input
+                        class="input"
+                        id="customerPhone"
+                        type="tel"
+                        inputmode="numeric"
+                        maxlength="10"
+                        placeholder="10 digit phone number"
+                    >
+
+                    <div id="customerPhoneError" class="error hidden">
+                        Phone number must contain exactly 10 digits.
+                    </div>
+
+                </div>
+
+                <div class="form-group">
+
+                    <label for="customerPlace">Place</label>
+
+                    <input
+                        class="input"
+                        id="customerPlace"
+                        maxlength="80"
+                        placeholder="Enter place"
+                    >
+
+                </div>
+
+                <div class="form-group">
+
+                    <label for="customerStartDate">Starting Date</label>
+
+                    <input
+                        class="input"
+                        id="customerStartDate"
+                        type="date"
+                    >
+
+                </div>
+
+            </div>
+
+            <div class="modal-footer">
+
+                <button
+                    type="button"
+                    class="btn btn-light"
+                    onclick="closeModal('customerModal')"
+                >
+                    Cancel
+                </button>
+
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-lg"></i>
+                    Save Customer
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+<!-- ================= MILK MODAL ================= -->
+
+<div class="modal" id="milkModal">
+
+    <div class="modal-box">
+
+        <div class="modal-head">
+
+            <h3 id="milkModalTitle">Add Morning Milk</h3>
+
+            <button class="modal-close" onclick="closeModal('milkModal')">
+                <i class="bi bi-x-lg"></i>
+            </button>
+
+        </div>
+
+        <form id="milkForm" onsubmit="saveMilkEntry(event)">
+
+            <div class="modal-body">
+
+                <input type="hidden" id="milkId">
+
+                <div class="form-group">
+
+                    <label for="milkCustomer">Customer *</label>
+
+                    <select class="input" id="milkCustomer" required>
+                        <option value="">Select customer</option>
+                    </select>
+
+                </div>
+
+                <div class="form-grid two">
+
+                    <div class="form-group">
+
+                        <label for="milkDate">Date *</label>
+
+                        <input
+                            class="input"
+                            id="milkDate"
+                            type="date"
+                            required
+                        >
+
+                    </div>
+
+                    <div class="form-group">
+
+                        <label for="milkLitres">Litres *</label>
+
+                        <input
+                            class="input"
+                            id="milkLitres"
+                            type="number"
+                            min="0.01"
+                            max="9999"
+                            step="0.01"
+                            required
+                            placeholder="0.00"
+                            oninput="updateMilkPreview()"
+                        >
+
+                    </div>
+
+                </div>
+
+                <div class="form-grid two">
+
+                    <div class="form-group">
+
+                        <label for="milkRate">Rate / Litre *</label>
+
+                        <input
+                            class="input"
+                            id="milkRate"
+                            type="number"
+                            min="0.01"
+                            max="100000"
+                            step="0.01"
+                            required
+                            placeholder="42.00"
+                            oninput="updateMilkPreview()"
+                        >
+
+                    </div>
+
+                    <div class="form-group">
+
+                        <label for="milkFat">FAT %</label>
+
+                        <input
+                            class="input"
+                            id="milkFat"
+                            type="number"
+                            min="0"
+                            max="15"
+                            step="0.01"
+                            placeholder="4.20"
+                        >
+
+                    </div>
+
+                </div>
+
+                <div class="form-group">
+
+                    <label for="milkSnf">SNF %</label>
+
+                    <input
+                        class="input"
+                        id="milkSnf"
+                        type="number"
+                        min="0"
+                        max="15"
+                        step="0.01"
+                        placeholder="8.50"
+                    >
+
+                </div>
+
+                <div class="amount-preview">
+
+                    <span>Collection Amount</span>
+
+                    <strong id="milkAmountPreview">₹0.00</strong>
+
+                </div>
+
+            </div>
+
+            <div class="modal-footer">
+
+                <button
+                    type="button"
+                    class="btn btn-light"
+                    onclick="closeModal('milkModal')"
+                >
+                    Cancel
+                </button>
+
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-lg"></i>
+                    Save Entry
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+<!-- ================= PAYMENT MODAL ================= -->
+
+<div class="modal" id="paymentModal">
+
+    <div class="modal-box">
+
+        <div class="modal-head">
+
+            <h3 id="paymentModalTitle">Add Payment</h3>
+
+            <button class="modal-close" onclick="closeModal('paymentModal')">
+                <i class="bi bi-x-lg"></i>
+            </button>
+
+        </div>
+
+        <form id="paymentForm" onsubmit="savePayment(event)">
+
+            <div class="modal-body">
+
+                <input type="hidden" id="paymentId">
+
+                <div class="form-group">
+
+                    <label for="paymentCustomer">Customer *</label>
+
+                    <select class="input" id="paymentCustomer" required>
+                        <option value="">Select customer</option>
+                    </select>
+
+                </div>
+
+                <div class="form-group">
+
+                    <label for="paymentType">Transaction Type</label>
+
+                    <select class="input" id="paymentType">
+                        <option value="Advance">Advance</option>
+                        <option value="Payment">Payment</option>
+                    </select>
+
+                </div>
+
+                <div class="form-grid two">
+
+                    <div class="form-group">
+
+                        <label for="paymentDate">Date *</label>
+
+                        <input
+                            class="input"
+                            id="paymentDate"
+                            type="date"
+                            required
+                        >
+
+                    </div>
+
+                    <div class="form-group">
+
+                        <label for="paymentAmount">Amount *</label>
+
+                        <input
+                            class="input"
+                            id="paymentAmount"
+                            type="number"
+                            min="0.01"
+                            max="100000000"
+                            step="0.01"
+                            required
+                            placeholder="0.00"
+                        >
+
+                    </div>
+
+                </div>
+
+                <div class="form-group">
+
+                    <label for="paymentMethod">Payment Method</label>
+
+                    <select class="input" id="paymentMethod">
+                        <option value="Cash">Cash</option>
+                        <option value="UPI">UPI</option>
+                        <option value="Bank Transfer">Bank Transfer</option>
+                        <option value="Other">Other</option>
+                    </select>
+
+                </div>
+
+                <div class="form-group">
+
+                    <label for="paymentNote">Note</label>
+
+                    <textarea
+                        class="input"
+                        id="paymentNote"
+                        maxlength="250"
+                        placeholder="Optional note..."
+                    ></textarea>
+
+                </div>
+
+            </div>
+
+            <div class="modal-footer">
+
+                <button
+                    type="button"
+                    class="btn btn-light"
+                    onclick="closeModal('paymentModal')"
+                >
+                    Cancel
+                </button>
+
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-lg"></i>
+                    Save Payment
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+<script src="script.js"></script>
+
+</body>
+</html>
