@@ -66,6 +66,76 @@ textarea.input:focus-visible{
 }
 
 /* =========================
+   LOGIN GATE
+========================= */
+
+.login-gate{
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+    background:linear-gradient(145deg,#e9f8ef,#f6f8f7 55%,#dff5e8);
+}
+
+.login-card{
+    width:min(100%,390px);
+    padding:30px 24px;
+    border:1px solid var(--border);
+    border-radius:24px;
+    background:rgba(255,255,255,.96);
+    box-shadow:var(--shadow);
+    text-align:center;
+}
+
+.login-icon{
+    width:62px;
+    height:62px;
+    margin:0 auto 16px;
+    display:grid;
+    place-items:center;
+    border-radius:20px;
+    background:var(--primary-soft);
+    color:var(--primary-dark);
+    font-size:28px;
+}
+
+.login-card h1{
+    font-family:var(--font-display);
+    font-size:24px;
+}
+
+.login-card p{
+    margin:7px 0 22px;
+    color:var(--muted);
+    font-size:12px;
+}
+
+.login-card label{
+    display:block;
+    margin-bottom:7px;
+    color:var(--text-2);
+    font-size:11px;
+    font-weight:800;
+    text-align:left;
+}
+
+.login-pin{
+    text-align:center;
+    letter-spacing:10px;
+    font-size:22px;
+    font-weight:800;
+    padding-left:18px;
+    margin-bottom:8px;
+}
+
+.login-card .error{
+    margin:7px 0 12px;
+}
+
+.app-locked{display:none!important}
+
+/* =========================
    APP SHELL
 ========================= */
 
