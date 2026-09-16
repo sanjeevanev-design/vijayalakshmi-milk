@@ -57,6 +57,16 @@
             >
 
             <div id="loginError" class="error hidden"></div>
+
+            <button
+                id="forgotPasswordButton"
+                class="forgot-password"
+                type="button"
+                onclick="sendPasswordReset()"
+            >
+                Forgot password?
+            </button>
+
             <button id="loginButton" class="btn btn-primary btn-block" type="submit">
                 <i class="bi bi-box-arrow-in-right"></i>
                 Sign In
@@ -582,30 +592,6 @@
         </div>
 
         <div class="form-group">
-            <label for="logoUpload">Business Logo</label>
-            <div class="logo-upload">
-                <div class="logo-preview" id="logoPreview">
-                    <i class="bi bi-image"></i>
-                </div>
-                <button type="button" class="btn btn-soft" onclick="document.getElementById('logoUpload').click()">
-                    <i class="bi bi-upload"></i>
-                    Upload Logo
-                </button>
-                <button type="button" class="btn btn-light" onclick="removeLogo()">
-                    <i class="bi bi-x-circle"></i>
-                    Remove
-                </button>
-                <input
-                    type="file"
-                    id="logoUpload"
-                    class="hidden"
-                    accept="image/png,image/jpeg,image/webp"
-                    onchange="handleLogoUpload(event)"
-                >
-            </div>
-        </div>
-
-        <div class="form-group">
             <label for="businessName">Business Name</label>
             <input
                 class="input"
@@ -689,6 +675,13 @@
                 <i class="bi bi-toggle-off toggle-icon" aria-hidden="true"></i>
             </label>
 
+        </div>
+
+        <div class="settings-save-actions">
+            <button type="button" class="btn btn-primary" onclick="saveSettings()">
+                <i class="bi bi-check-lg"></i>
+                Save Settings
+            </button>
         </div>
 
     </div>
@@ -1013,6 +1006,35 @@
 
     </div>
 
+</div>
+
+<!-- ================= CUSTOMER HISTORY MODAL ================= -->
+
+<div class="modal" id="customerHistoryModal">
+    <div class="modal-box history-modal-box">
+        <div class="history-modal-head">
+            <div class="history-heading">
+                <div class="history-heading-icon"><i class="bi bi-bar-chart-line-fill"></i></div>
+                <div>
+                    <span class="history-eyebrow">CUSTOMER INSIGHTS</span>
+                    <h3 id="customerHistoryTitle">Collection History</h3>
+                    <p>Review recent milk collection and quality performance.</p>
+                </div>
+            </div>
+            <button class="modal-close" onclick="closeModal('customerHistoryModal')" aria-label="Close">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        <div class="modal-body history-modal-body">
+            <div class="history-filter-label"><i class="bi bi-calendar3"></i> Collection period</div>
+            <div class="history-filter" role="group" aria-label="History period">
+                <button class="history-filter-btn active" data-days="7" onclick="setCustomerHistoryPeriod(7)">7 Days</button>
+                <button class="history-filter-btn" data-days="15" onclick="setCustomerHistoryPeriod(15)">15 Days</button>
+                <button class="history-filter-btn" data-days="30" onclick="setCustomerHistoryPeriod(30)">30 Days</button>
+            </div>
+            <div id="customerHistoryContent"></div>
+        </div>
+    </div>
 </div>
 
 <!-- ================= PAYMENT MODAL ================= -->
