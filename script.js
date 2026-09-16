@@ -20,13 +20,15 @@ let loginAttempts = 0;
 let loginLockedUntil = 0;
 
 const LOGIN_MAX_ATTEMPTS = 5;
-const LOGIN_LOCK_DURATION_MS = 3 * 24 * 60 * 60 * 1000;
+// This is only a small client-side UX throttle. Firebase remains the
+// authoritative rate limiter and account lockout mechanism.
+const LOGIN_LOCK_DURATION_MS = 15 * 60 * 1000;
 const LOGIN_SECURITY_STORAGE_KEY = "vijayalakshmi_login_security";
 
 function readLoginSecurity(){
     try{
         const saved = JSON.parse(
-            localStorage.getItem(LOGIN_SECURITY_STORAGE_KEY) || "{}"
+            sessionStorage.getItem(LOGIN_SECURITY_STORAGE_KEY) || "{}"
         );
 
         return {
@@ -44,7 +46,7 @@ function readLoginSecurity(){
 
 function writeLoginSecurity(security){
     try{
-        localStorage.setItem(
+        sessionStorage.setItem(
             LOGIN_SECURITY_STORAGE_KEY,
             JSON.stringify(security)
         );
@@ -58,22 +60,32 @@ function clearLoginSecurity(){
     loginLockedUntil = 0;
 
     try{
-        localStorage.removeItem(LOGIN_SECURITY_STORAGE_KEY);
+        sessionStorage.removeItem(LOGIN_SECURITY_STORAGE_KEY);
     }catch(error){
         console.warn("Could not clear login security state.",error);
     }
 }
 
 function formatLockTime(milliseconds){
-    const totalHours = Math.ceil(milliseconds / (60 * 60 * 1000));
-    const days = Math.floor(totalHours / 24);
-    const hours = totalHours % 24;
+    const totalMinutes = Math.max(1, Math.ceil(milliseconds / (60 * 1000)));
+    const days = Math.floor(totalMinutes / (24 * 60));
+    const remainingMinutes = totalMinutes % (24 * 60);
+    const hours = Math.floor(remainingMinutes / 60);
+    const minutes = remainingMinutes % 60;
 
     if(days > 0){
-        return `${days} day${days === 1 ? "" : "s"}${hours ? ` and ${hours} hour${hours === 1 ? "" : "s"}` : ""}`;
+        const parts = [`${days} day${days === 1 ? "" : "s"}`];
+        if(hours) parts.push(`${hours} hour${hours === 1 ? "" : "s"}`);
+        if(minutes) parts.push(`${minutes} minute${minutes === 1 ? "" : "s"}`);
+        return parts.join(" and ");
     }
 
-    return `${Math.max(1,hours)} hour${hours === 1 ? "" : "s"}`;
+    if(hours > 0){
+        return `${hours} hour${hours === 1 ? "" : "s"}` +
+            (minutes ? ` and ${minutes} minute${minutes === 1 ? "" : "s"}` : "");
+    }
+
+    return `${minutes} minute${minutes === 1 ? "" : "s"}`;
 }
 
 function firebaseConfigured(){
@@ -85,7 +97,62 @@ function showLoginError(message){
     const error = document.getElementById("loginError");
     if(!error) return;
     error.textContent = message;
+    error.classList.remove("success");
     error.classList.remove("hidden");
+}
+
+function showLoginMessage(message){
+    const error = document.getElementById("loginError");
+    if(!error) return;
+    error.textContent = message;
+    error.classList.remove("hidden");
+    error.classList.add("success");
+}
+
+async function sendPasswordReset(){
+    const emailInput = document.getElementById("loginEmail");
+    const button = document.getElementById("forgotPasswordButton");
+    const email = emailInput?.value.trim() || "";
+
+    document.getElementById("loginError")?.classList.remove("success");
+
+    if(!email){
+        emailInput?.focus();
+        showLoginError("Enter your email address first.");
+        return;
+    }
+
+    if(!emailInput.checkValidity()){
+        emailInput.focus();
+        showLoginError("Enter a valid email address.");
+        return;
+    }
+
+    if(!firebaseAuth){
+        showLoginError("Firebase Authentication is not available.");
+        return;
+    }
+
+    button.disabled = true;
+    button.textContent = "Sending...";
+
+    try{
+        await firebaseAuth.sendPasswordResetEmail(email);
+        showLoginMessage("Password reset email sent. Check your inbox and spam folder.");
+    }catch(error){
+        console.error("Firebase password reset failed:",error);
+
+        // Do not disclose whether an account exists for the submitted email.
+        // This prevents account-enumeration through the password-reset form.
+        const resetMessage = error?.code === "auth/invalid-email"
+            ? "Enter a valid email address."
+            : "If an account exists for that email, a password reset link has been sent.";
+
+        showLoginError(resetMessage);
+    }finally{
+        button.disabled = false;
+        button.textContent = "Forgot password?";
+    }
 }
 
 async function verifyLogin(event){
@@ -145,7 +212,7 @@ async function verifyLogin(event){
             });
             passwordInput.value = "";
             showLoginError(
-                "Sign-in locked for 3 days after 5 incorrect attempts."
+                "Too many unsuccessful attempts. Try again in 15 minutes."
             );
             return;
         }
@@ -352,7 +419,13 @@ function entryAmount(record){
 
     if(litres === null || rate === null) return 0;
 
-    return litres * rate;
+    // Keep every display and financial total aligned to paise precision.
+    return Number((litres * rate).toFixed(2));
+}
+
+function paymentAmount(record){
+    const amount = safeNumber(record?.amount,0,100000000);
+    return amount === null ? 0 : Number(amount.toFixed(2));
 }
 
 function getCustomer(id){
@@ -388,112 +461,6 @@ function isISODate(value){
     return date.getFullYear() === year &&
         date.getMonth() === month-1 &&
         date.getDate() === day;
-}
-
-function today(){
-    const d = new Date();
-
-    return [
-        d.getFullYear(),
-        String(d.getMonth()+1).padStart(2,"0"),
-        String(d.getDate()).padStart(2,"0")
-    ].join("-");
-}
-
-function startOfMonth(){
-    const d = new Date();
-
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-01`;
-}
-
-function uid(prefix){
-    if(window.crypto && crypto.randomUUID){
-        return prefix + "_" + crypto.randomUUID();
-    }
-
-    return prefix + "_" + Date.now() + "_" +
-        Math.random().toString(36).slice(2,10);
-}
-
-function money(value){
-    const n = Number(value);
-
-    return "₹" + (Number.isFinite(n) ? n : 0)
-        .toLocaleString("en-IN",{
-            minimumFractionDigits:2,
-            maximumFractionDigits:2
-        });
-}
-
-function formatDate(value){
-    if(!value) return "-";
-
-    const d = new Date(value + "T00:00:00");
-
-    if(Number.isNaN(d.getTime())) return "-";
-
-    return d.toLocaleDateString("en-IN",{
-        day:"2-digit",
-        month:"short",
-        year:"numeric"
-    });
-}
-
-function escapeHTML(value){
-    return String(value ?? "")
-        .replace(/&/g,"&amp;")
-        .replace(/</g,"&lt;")
-        .replace(/>/g,"&gt;")
-        .replace(/"/g,"&quot;")
-        .replace(/'/g,"&#039;");
-}
-
-/* Escapes a value for safe use inside an HTML attribute (e.g. src="...").
-   Same as escapeHTML but kept as a distinct name so attribute-context
-   call sites are easy to audit. */
-function escapeAttr(value){
-    return escapeHTML(value);
-}
-
-function safeNumber(value,min=0,max=Number.MAX_SAFE_INTEGER){
-    const n = Number(value);
-
-    if(!Number.isFinite(n)) return null;
-
-    if(n < min || n > max) return null;
-
-    return n;
-}
-
-function entryAmount(record){
-    const litres = safeNumber(record?.litres,0,999999999);
-    const rate = safeNumber(record?.rate,0,999999999);
-
-    if(litres === null || rate === null) return 0;
-
-    return litres * rate;
-}
-
-function getCustomer(id){
-    return customers.find(c => c.id === id);
-}
-
-function customerName(id){
-    const c = getCustomer(id);
-    return c ? String(c.name) : "Unknown Customer";
-}
-
-function initials(name){
-    const text = String(name || "?").trim();
-
-    if(!text) return "?";
-
-    return text
-        .split(/\s+/)
-        .slice(0,2)
-        .map(x => x[0])
-        .join("")
-        .toUpperCase();
 }
 
 function showToast(message,error=false){
@@ -842,7 +809,7 @@ function renderCustomers(){
 
                 const litres =
                     records.reduce(
-                        (sum,m)=>sum+Number(m.litres||0),
+                        (sum,m)=>sum+(safeNumber(m.litres,0,9999) || 0),
                         0
                     );
 
@@ -1270,6 +1237,105 @@ function deleteMilk(id){
     showToast("Milk entry deleted.");
 }
 
+let customerHistoryId = null;
+let customerHistoryDays = 7;
+
+function openCustomerHistory(customerId){
+    const customer = getCustomer(customerId);
+    if(!customer){
+        showToast("Customer not found.",true);
+        return;
+    }
+
+    customerHistoryId = customerId;
+    customerHistoryDays = 7;
+    document.getElementById("customerHistoryTitle").textContent =
+        `${customer.name} · Collection History`;
+    renderCustomerHistory();
+    openModal("customerHistoryModal");
+}
+
+function setCustomerHistoryPeriod(days){
+    if(![7,15,30].includes(days)) return;
+    customerHistoryDays = days;
+    renderCustomerHistory();
+}
+
+function renderCustomerHistory(){
+    const container = document.getElementById("customerHistoryContent");
+    const customer = getCustomer(customerHistoryId);
+    if(!container || !customer) return;
+
+    document.querySelectorAll(".history-filter-btn").forEach(button=>{
+        button.classList.toggle(
+            "active",
+            Number(button.dataset.days) === customerHistoryDays
+        );
+    });
+
+    const cutoff = addDaysToISO(today(), -(customerHistoryDays - 1));
+    const records = milk
+        .filter(record =>
+            record.customerId === customerHistoryId &&
+            record.date >= cutoff &&
+            record.date <= today()
+        )
+        .sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+
+    const totalLitres = records.reduce(
+        (sum,record)=>sum+(safeNumber(record.litres,0,9999) || 0),
+        0
+    );
+    const totalAmount = records.reduce((sum,record)=>sum+entryAmount(record),0);
+    const fatRecords = records.filter(record=>Number.isFinite(Number(record.fat)));
+    const snfRecords = records.filter(record=>Number.isFinite(Number(record.snf)));
+    const avgFat = fatRecords.length
+        ? fatRecords.reduce((sum,record)=>sum+Number(record.fat),0) / fatRecords.length
+        : 0;
+    const avgSnf = snfRecords.length
+        ? snfRecords.reduce((sum,record)=>sum+Number(record.snf),0) / snfRecords.length
+        : 0;
+
+    container.innerHTML = `
+        ${records.length ? `
+            <div class="table-wrap history-table-wrap">
+                <table class="data-table customer-history-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th><th>Litres</th><th>FAT</th>
+                            <th>SNF</th><th>Rate</th><th>Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${records.map(record=>`
+                            <tr>
+                                <td>${formatDate(record.date)}</td>
+                                <td>${Number(record.litres || 0).toFixed(2)} L</td>
+                                <td>${Number(record.fat || 0).toFixed(2)}%</td>
+                                <td>${Number(record.snf || 0).toFixed(2)}%</td>
+                                <td>${money(record.rate)}</td>
+                                <td class="amount">${money(entryAmount(record))}</td>
+                            </tr>
+                        `).join("")}
+                    </tbody>
+                </table>
+            </div>
+        ` : `
+            <div class="empty history-empty">
+                <div class="empty-icon"><i class="bi bi-droplet"></i></div>
+                <strong>No collection history</strong>
+                <p>No records found in the last ${customerHistoryDays} days.</p>
+            </div>
+        `}
+        <div class="history-summary">
+            <div><small>Total Litres</small><strong>${totalLitres.toFixed(2)} L</strong></div>
+            <div><small>Avg FAT</small><strong>${avgFat.toFixed(2)}%</strong></div>
+            <div><small>Avg SNF</small><strong>${avgSnf.toFixed(2)}%</strong></div>
+            <div><small>Total Amount</small><strong>${money(totalAmount)}</strong></div>
+        </div>
+    `;
+}
+
 
 /* =========================================================
    MILK COLLECTION DATE HELPERS
@@ -1356,7 +1422,7 @@ function renderTodayMilkTable(records, search){
         .sort((a,b)=>String(a.id).localeCompare(String(b.id)));
 
     const totalLitres = list.reduce(
-        (sum,m)=>sum+Number(m.litres||0),0
+        (sum,m)=>sum+(safeNumber(m.litres,0,9999) || 0),0
     );
 
     const totalAmount = list.reduce(
@@ -1420,6 +1486,7 @@ function renderTodayMilkTable(records, search){
                             <th>Rate/L</th>
                             <th>Amount</th>
                             <th>Message</th>
+                            <th>History</th>
                             <th>Action</th>
                         </tr>
                     </thead>
@@ -1451,6 +1518,16 @@ function renderTodayMilkTable(records, search){
                                         </button>
                                     </td>
                                     <td>
+                                        <button
+                                            class="icon-btn icon-history"
+                                            onclick="openCustomerHistory('${escapeAttr(m.customerId)}')"
+                                            aria-label="View all collection history"
+                                            title="View all collection history"
+                                        >
+                                            <i class="bi bi-eye"></i>
+                                        </button>
+                                    </td>
+                                    <td>
                                         <div class="actions">
                                             <button class="icon-btn icon-edit" onclick="openMilkModal('${escapeAttr(m.id)}')" aria-label="Edit">
                                                 <i class="bi bi-pencil"></i>
@@ -1473,6 +1550,7 @@ function renderTodayMilkTable(records, search){
                             <td>—</td>
                             <td>—</td>
                             <td>${money(totalAmount)}</td>
+                            <td>—</td>
                             <td>—</td>
                             <td>—</td>
                         </tr>
@@ -1891,7 +1969,7 @@ function renderAdvance(){
 
     const total =
         advances.reduce(
-            (sum,p)=>sum+Number(p.amount||0),
+            (sum,p)=>sum+paymentAmount(p),
             0
         );
 
@@ -2022,7 +2100,7 @@ function getCustomerFinancials(customerId){
 
     const paidAmount =
         customerPayments.reduce(
-            (sum,p)=>sum+(safeNumber(p.amount,0,100000000) || 0),
+            (sum,p)=>sum+paymentAmount(p),
             0
         );
 
@@ -2030,7 +2108,7 @@ function getCustomerFinancials(customerId){
         customerPayments
             .filter(p=>p.type==="Advance")
             .reduce(
-                (sum,p)=>sum+(safeNumber(p.amount,0,100000000) || 0),
+                (sum,p)=>sum+paymentAmount(p),
                 0
             );
 
@@ -3013,33 +3091,35 @@ function generateStatementPreview(){
 function renderStatementSummary(data){
 
     const {
-        totalLitres,
         totalAmount,
-        totalPaid,
         statementPayments
     } = data;
 
-    const gstPercent = safeNumber(settings.businessGstPercent,0,100) || 0;
-    const gstAmount = Number((totalAmount * gstPercent / 100).toFixed(2));
-    const grandTotal = Number((totalAmount + gstAmount).toFixed(2));
+    const advanceAmount = statementPayments
+        .filter(payment=>payment.type === "Advance")
+        .reduce((sum,payment)=>sum + paymentAmount(payment),0);
+
+    const paidAmount = statementPayments
+        .filter(payment=>payment.type === "Payment")
+        .reduce((sum,payment)=>sum + paymentAmount(payment),0);
 
     return `
 
-        <div class="a4-summary">
+        <div class="a4-summary a4-summary-rows">
 
             <div class="a4-summary-box">
-                <small>Total Milk</small>
-                <strong>${Number(totalLitres || 0).toFixed(2)} L</strong>
+                <small>Total Amount</small>
+                <strong>${money(totalAmount)}</strong>
             </div>
 
             <div class="a4-summary-box">
-                <small>GST (${gstPercent.toFixed(2)}%)</small>
-                <strong>${money(gstAmount)}</strong>
+                <small>Advance Amount</small>
+                <strong>${money(advanceAmount)}</strong>
             </div>
 
             <div class="a4-summary-box">
-                <small>Total Paid</small>
-                <strong>${money(totalPaid)}</strong>
+                <small>Paid Amount</small>
+                <strong>${money(paidAmount)}</strong>
             </div>
 
         </div>
